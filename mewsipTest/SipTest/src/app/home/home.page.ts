@@ -24,7 +24,7 @@ export class HomePage implements AfterViewInit {
 
 
   userAgent: UA;
-
+  
   callSession: InviteClientContext;
   remoteCallSession: InviteServerContext;
 
@@ -44,30 +44,38 @@ export class HomePage implements AfterViewInit {
 
     this.userAgent = new UA(options)
     this.userAgent.on('invite', (session:InviteServerContext) => this.recievingCall(session));
-    this.userAgent.on('registered',(response?:any) => { console.log('registered'); console.log(response); this.userAgent.invite('10'); } );
+  this.userAgent.on('registered',(response?:any) => { console.log('registered'); console.log(response); this.userAgent.invite('10'); } );
     this.userAgent.on('registrationFailed',(response?: any, cause?: any) => console.log('failed to register: ' + cause));
-    this.userAgent.on('inviteSent',(session:InviteClientContext) => { console.log('RECIEVED CALL'); console.log(session); })
+    this.userAgent.on('inviteSent',(session:InviteClientContext) => { this.calling(session); })
 
   }
 
   calling(context: InviteClientContext)
   {
+    
      this.callSession = context;
+     console.log(this.callSession);
      context.on('failed',(reponse?:any,cause?:any) =>{ console.log("failed"); console.log(cause); });
-     context.on("accepted",(response: any,cause:any) => { console.log(cause);  console.log(response); })
-     context.on('trackAdded', this.AttachIncommingMedia);
+     context.on("accepted",(response: any,cause:any) => { console.log('accepted');  console.log(response); })
+     context.on('trackAdded', () => this.AttachOutgoingMedia());
   }
 
 
   recievingCall(context: InviteServerContext) {
     console.log("incomming call");
     this.remoteCallSession = context;
+    //accept the call
     context.accept();
-    context.on('trackAdded', this.AttachIncommingMedia);
+    //when the track added event is called you can add it to the video element on the html
+    context.on('trackAdded',() => this.AttachIncommingMedia());
   }
 
-   AttachOutgoingMedia()
+  //attach the video for an outgoing call
+   AttachOutgoingMedia() : InviteClientContext
    {
+    console.log("incomming media:");
+    console.log(this);
+    console.log(this.callSession.sessionDescriptionHandler)
       //get the peer Connection
     var pc = this.callSession.sessionDescriptionHandler["peerConnection"];
     //make the media stream
@@ -82,12 +90,17 @@ export class HomePage implements AfterViewInit {
     this.remote.nativeElement.play();
 
     console.log(this.remote.nativeElement);
+
+    return this.callSession;
    }
 
   //attach the video for an incomming call
   AttachIncommingMedia() {
+    console.log("incomming media:");
+    console.log(this.remoteCallSession);
+    console.log(this.remoteCallSession.sessionDescriptionHandler)
     //get the peer Connection
-    var pc = this.remoteCallSession.sessionDescriptionHandler["peerConnection"];
+    var pc = this.remoteCallSession.sessionDescriptionHandler['peerConnection'];
     //make the media stream
     var remoteStream = new MediaStream();
     //get audio and video track from remote
