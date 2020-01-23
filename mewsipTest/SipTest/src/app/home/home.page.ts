@@ -1,8 +1,9 @@
 import { Component, ViewChild, OnInit, AfterViewInit } from '@angular/core';
-import { Simple } from 'sip.js/lib/Web';
-import { InviteServerContext, InviteClientContext } from 'sip.js/lib/Session';
-import { UA } from 'sip.js/lib/UA';
-import { SessionDescriptionHandler } from 'sip.js/lib/session-description-handler';
+import { SipConfig,SipService } from '@ubie/sip';
+import { AlertController } from '@ionic/angular';
+
+
+
 
 @Component({
   selector: 'app-home',
@@ -23,110 +24,70 @@ export class HomePage implements AfterViewInit {
   @ViewChild('remoteVideo', { static: false }) remote: any;
 
 
-  userAgent: UA;
-  
-  callSession: InviteClientContext;
-  remoteCallSession: InviteServerContext;
+  async MakeAllert(message:string) 
+  {
+    const alert = await   this.alertcontr.create({
+      buttons:[
+        {
+          text: 'Deny',
+          role: 'cancel',
+          handler: () => {
+            console.log('Cancel clicked');
+            this.sip.refuseCall()
+          }},
+          {
+            text: 'Accept',
+           
+            handler: () => {
+              console.log('Cancel clicked');
+              this.sip.acceptCall()
+            }
+          }
+        
+      ],
+      message:message
+    });
 
-  constructor() {
+    await alert.present();
+    
+  }
 
-    var options: UA.Options = {
 
-      uri: '104@sip.qbus.be',
-      authorizationUser: '104',
-      displayName:'wouter',
-      transportOptions: {
-        wsServers: ['wss://sip.qbus.be:8089/ws']
-      },
-      password: 'AABBCCDDEEFF'
+  constructor(public sip:SipService, private alertcontr:AlertController) {
+
+    sip.OnRegistered.subscribe((result:boolean) => {
+         console.log("REGISTERED:" + result);
+    });
+
+    sip.OnIncommingCall.subscribe((result:string) => {
+      console.log("Incomming call: " + result);
+      this.MakeAllert(result + " ... is calling");
+     });
+
+ sip.OnMediaRecieved.subscribe((result:MediaStream) => {
+ 
+     this.remote.nativeElement["srcObject"]  = result;
+      this.remote.nativeElement.play();
+
+    });
+
+    var options: SipConfig = {
+
+      Uri: '104@sip.qbus.be',
+      UserName: '104',
+      DisplayName:'wouter',
+      WebsocketUrl:
+     'wss://sip.qbus.be:8089/ws'
+      ,
+      Password: 'AABBCCDDEEFF'
 
     };
 
-    this.userAgent = new UA(options)
-    this.userAgent.on('invite', (session:InviteServerContext) => this.recievingCall(session));
-  this.userAgent.on('registered',(response?:any) => { console.log('registered'); console.log(response); this.userAgent.invite('10'); } );
-    this.userAgent.on('registrationFailed',(response?: any, cause?: any) => console.log('failed to register: ' + cause));
-    this.userAgent.on('inviteSent',(session:InviteClientContext) => { this.calling(session); })
+    sip.setConfig(options);
 
-  }
-
-  calling(context: InviteClientContext)
-  {
-    
-     this.callSession = context;
-     console.log(this.callSession);
-     context.on('failed',(reponse?:any,cause?:any) =>{ console.log("failed"); console.log(cause); });
-     context.on("accepted",(response: any,cause:any) => { console.log('accepted');  console.log(response); })
-     context.on('trackAdded', () => this.AttachOutgoingMedia());
-  }
-
-
-  recievingCall(context: InviteServerContext) {
-    console.log("incomming call");
-    this.remoteCallSession = context;
-    //accept the call
-    context.accept();
-    //when the track added event is called you can add it to the video element on the html
-    context.on('trackAdded',() => this.AttachIncommingMedia());
-  }
-
-  //attach the video for an outgoing call
-   AttachOutgoingMedia() : InviteClientContext
-   {
-    console.log("incomming media:");
-    console.log(this);
-    console.log(this.callSession.sessionDescriptionHandler)
-      //get the peer Connection
-    var pc = this.callSession.sessionDescriptionHandler["peerConnection"];
-    //make the media stream
-    var remoteStream = new MediaStream();
-    //get audio and video track from remote
-    pc.getReceivers().forEach(function (receiver) {
-      remoteStream.addTrack(receiver.track);
-    });
-
-    //add the stream to the video element
-    this.remote.nativeElement["srcObject"] = remoteStream;
-    this.remote.nativeElement.play();
-
-    console.log(this.remote.nativeElement);
-
-    return this.callSession;
-   }
-
-  //attach the video for an incomming call
-  AttachIncommingMedia() {
-    console.log("incomming media:");
-    console.log(this.remoteCallSession);
-    console.log(this.remoteCallSession.sessionDescriptionHandler)
-    //get the peer Connection
-    var pc = this.remoteCallSession.sessionDescriptionHandler['peerConnection'];
-    //make the media stream
-    var remoteStream = new MediaStream();
-    //get audio and video track from remote
-    pc.getReceivers().forEach(function (receiver) {
-      remoteStream.addTrack(receiver.track);
-    });
-
-    //add the stream to the video element
-    this.remote.nativeElement["srcObject"] = remoteStream;
-    this.remote.nativeElement.play();
-
-    console.log(this.remote.nativeElement);
   }
 
  
-
- 
-
-  hangUp() {
-    if(this.remoteCallSession !== undefined)
-    {
-      this.callSession.terminate();
-      this.callSession = undefined;
-    }
-  
-  }
 
 
 }
